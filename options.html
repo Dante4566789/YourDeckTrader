@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Opzioni · CardTrader Deck Cart</title>
+    <link rel="stylesheet" href="styles/base.css" />
+    <link rel="stylesheet" href="styles/options.css" />
+  </head>
+  <body class="options-body">
+    <header class="options-header">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"><span></span></div>
+        <div>
+          <h1 class="brand-title">CardTrader Deck Cart</h1>
+          <p class="brand-subtitle">Opzioni dell'estensione · dati solo in locale</p>
+        </div>
+      </div>
+      <span class="badge badge-neutral">Nessun acquisto automatico</span>
+    </header>
+
+    <main class="options-main">
+      <form id="settings-form" novalidate>
+        <section class="card panel" aria-labelledby="token-title">
+          <div class="panel-heading">
+            <div>
+              <h2 id="token-title">Token API CardTrader</h2>
+              <p class="panel-description">
+                Lo trovi nel profilo CardTrader, nella sezione API. Viene salvato solo in
+                <strong>chrome.storage.local</strong> e inviato esclusivamente a
+                <span class="mono">api.cardtrader.com</span>.
+              </p>
+            </div>
+            <span id="token-badge" class="badge badge-red">Non configurato</span>
+          </div>
+
+          <div class="field" id="token-field">
+            <label for="token">Token personale</label>
+            <div class="input-row">
+              <input
+                id="token"
+                name="token"
+                type="password"
+                autocomplete="new-password"
+                spellcheck="false"
+                placeholder="Incolla il token CardTrader"
+              />
+              <button type="button" class="btn btn-small" id="toggle-token">Mostra</button>
+            </div>
+            <span class="hint">Il token non viene mai mostrato nel popup né scritto nei report.</span>
+            <span class="error" data-error-for="token"></span>
+          </div>
+
+          <div class="inline-actions">
+            <button type="button" class="btn" id="verify-token">Verifica token</button>
+            <span id="token-status" class="status status-info" role="status" hidden></span>
+          </div>
+        </section>
+
+        <section class="card panel" aria-labelledby="prefs-title">
+          <div class="panel-heading">
+            <div>
+              <h2 id="prefs-title">Preferenze di ricerca</h2>
+              <p class="panel-description">
+                Lingua delle carte e condizione minima accettata. Le condizioni migliori
+                della minima sono sempre incluse.
+              </p>
+            </div>
+          </div>
+
+          <div class="form-grid two">
+            <div class="field">
+              <label for="language">Lingua</label>
+              <select id="language" name="language"></select>
+            </div>
+            <div class="field">
+              <label for="min-condition">Condizione minima</label>
+              <select id="min-condition" name="minCondition"></select>
+              <span class="hint">Mint e Near Mint sono le condizioni migliori.</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card panel" aria-labelledby="addresses-title">
+          <div class="panel-heading">
+            <div>
+              <h2 id="addresses-title">Indirizzi</h2>
+              <p class="panel-description">
+                CardTrader richiede fatturazione e spedizione a ogni aggiunta al carrello.
+                Usa il formato accettato dall'API: nome, via, CAP, città, provincia e paese.
+              </p>
+            </div>
+          </div>
+
+          <fieldset class="address-block">
+            <legend>Indirizzo di fatturazione</legend>
+            <div class="form-grid two">
+              <div class="field">
+                <label for="billing-name">Nome e cognome</label>
+                <input id="billing-name" name="billingName" autocomplete="name" />
+                <span class="error" data-error-for="billingName"></span>
+              </div>
+              <div class="field">
+                <label for="billing-country">Paese (ISO 2 lettere)</label>
+                <input
+                  id="billing-country"
+                  name="billingCountry"
+                  maxlength="2"
+                  placeholder="IT"
+                  autocomplete="country"
+                />
+                <span class="error" data-error-for="billingCountry"></span>
+              </div>
+              <div class="field span-two">
+                <label for="billing-street">Via e numero civico</label>
+                <input id="billing-street" name="billingStreet" autocomplete="street-address" />
+                <span class="error" data-error-for="billingStreet"></span>
+              </div>
+              <div class="field">
+                <label for="billing-zip">CAP</label>
+                <input id="billing-zip" name="billingZip" autocomplete="postal-code" />
+                <span class="error" data-error-for="billingZip"></span>
+              </div>
+              <div class="field">
+                <label for="billing-city">Città</label>
+                <input id="billing-city" name="billingCity" autocomplete="address-level2" />
+                <span class="error" data-error-for="billingCity"></span>
+              </div>
+              <div class="field">
+                <label for="billing-state">Provincia / stato <span class="optional">(facoltativo)</span></label>
+                <input id="billing-state" name="billingState" autocomplete="address-level1" />
+              </div>
+            </div>
+          </fieldset>
+
+          <label class="checkbox same-address">
+            <input type="checkbox" id="same-address" name="sameAddress" />
+            <span>Usa lo stesso indirizzo per la spedizione</span>
+          </label>
+
+          <fieldset class="address-block" id="shipping-block">
+            <legend>Indirizzo di spedizione</legend>
+            <div class="form-grid two">
+              <div class="field">
+                <label for="shipping-name">Nome e cognome</label>
+                <input id="shipping-name" name="shippingName" autocomplete="name" />
+                <span class="error" data-error-for="shippingName"></span>
+              </div>
+              <div class="field">
+                <label for="shipping-country">Paese (ISO 2 lettere)</label>
+                <input
+                  id="shipping-country"
+                  name="shippingCountry"
+                  maxlength="2"
+                  placeholder="IT"
+                  autocomplete="country"
+                />
+                <span class="error" data-error-for="shippingCountry"></span>
+              </div>
+              <div class="field span-two">
+                <label for="shipping-street">Via e numero civico</label>
+                <input id="shipping-street" name="shippingStreet" autocomplete="street-address" />
+                <span class="error" data-error-for="shippingStreet"></span>
+              </div>
+              <div class="field">
+                <label for="shipping-zip">CAP</label>
+                <input id="shipping-zip" name="shippingZip" autocomplete="postal-code" />
+                <span class="error" data-error-for="shippingZip"></span>
+              </div>
+              <div class="field">
+                <label for="shipping-city">Città</label>
+                <input id="shipping-city" name="shippingCity" autocomplete="address-level2" />
+                <span class="error" data-error-for="shippingCity"></span>
+              </div>
+              <div class="field">
+                <label for="shipping-state">Provincia / stato <span class="optional">(facoltativo)</span></label>
+                <input id="shipping-state" name="shippingState" autocomplete="address-level1" />
+              </div>
+            </div>
+          </fieldset>
+        </section>
+
+        <section class="card panel" aria-labelledby="mapping-title">
+          <div class="panel-heading">
+            <div>
+              <h2 id="mapping-title">Mapping espansioni</h2>
+              <p class="panel-description">
+                Se il codice del mazzo non coincide con quello CardTrader, aggiungi una
+                corrispondenza. Il valore può essere un codice (es. <span class="mono">meg</span>)
+                o il nome esatto dell'espansione (es. <span class="mono">Mega Evolution</span>).
+                Il codice esatto CardTrader ha sempre la precedenza.
+              </p>
+            </div>
+            <button type="button" class="btn btn-small" id="add-mapping">Aggiungi riga</button>
+          </div>
+
+          <div class="mapping-table-wrap">
+            <table class="mapping-table">
+              <thead>
+                <tr>
+                  <th scope="col">Codice nel mazzo</th>
+                  <th scope="col">Codice o nome CardTrader</th>
+                  <th scope="col" class="narrow"><span class="visually-hidden">Azioni</span></th>
+                </tr>
+              </thead>
+              <tbody id="mapping-body"></tbody>
+            </table>
+          </div>
+          <p class="hint mapping-hint">
+            La riga <span class="mono">MEG → Mega Evolution</span> è un fallback precompilato:
+            non è stato possibile verificarlo contro l'API in questo momento. Modificalo se
+            CardTrader usa un codice o un nome diverso.
+          </p>
+        </section>
+
+        <section class="card panel" aria-labelledby="data-title">
+          <div class="panel-heading">
+            <div>
+              <h2 id="data-title">Dati locali</h2>
+              <p class="panel-description">
+                Giochi, espansioni e blueprint sono memorizzati in cache per 12–24 ore.
+                Gli indirizzi e il token restano nel profilo Chrome.
+              </p>
+            </div>
+          </div>
+          <div class="inline-actions">
+            <button type="button" class="btn" id="clear-cache">Svuota cache CardTrader</button>
+            <span id="cache-status" class="status status-info" role="status" hidden></span>
+          </div>
+        </section>
+
+        <div class="save-bar">
+          <div id="save-status" class="save-status" role="status" aria-live="polite"></div>
+          <button type="submit" class="btn btn-gold" id="save-settings">Salva impostazioni</button>
+        </div>
+      </form>
+
+      <p class="footer-note">
+        CardTrader Deck Cart non è affiliato a CardTrader. L'estensione aggiunge prodotti al
+        carrello e non chiama mai l'endpoint di acquisto.
+      </p>
+    </main>
+
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

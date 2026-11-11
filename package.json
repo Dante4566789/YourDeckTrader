@@ -1,0 +1,17 @@
+{
+  "name": "cardtrader-deck-cart",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Estensione Chrome per trovare offerte CardTrader Zero e riempire il carrello da una lista mazzo Pokémon TCG Live.",
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\"",
+    "test:live": "node --test tests/api-live.test.js",
+    "check:api": "node tools/check-api.mjs",
+    "probe:api": "node tools/probe-api.mjs",
+    "inspect:api": "node tools/inspect-api.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CardTrader Deck Cart</title>
+    <link rel="stylesheet" href="styles/base.css" />
+    <link rel="stylesheet" href="styles/popup.css" />
+  </head>
+  <body class="popup-body">
+    <header class="popup-header">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"><span></span></div>
+        <div>
+          <h1 class="brand-title">CardTrader Deck Cart</h1>
+          <p class="brand-subtitle">Anteprima prima, carrello poi</p>
+        </div>
+      </div>
+      <div class="popup-header-actions">
+        <button type="button" class="btn btn-small" id="open-options">Opzioni</button>
+        <button type="button" class="btn btn-small" id="open-tab">Apri in scheda</button>
+      </div>
+    </header>
+
+    <main class="popup-main">
+      <div id="setup-banner" class="status status-warning setup-banner" role="status" hidden>
+        <span id="setup-message"></span>
+        <button type="button" class="btn btn-small" id="setup-options">Configura</button>
+      </div>
+
+      <section class="card panel deck-panel" aria-labelledby="deck-title">
+        <div class="panel-heading">
+          <div>
+            <h2 id="deck-title">Lista mazzo</h2>
+            <p class="panel-description">
+              Incolla la lista Pokémon TCG Live: <span class="mono">quantità nome SET numero</span>.
+            </p>
+          </div>
+          <span class="badge badge-neutral">PTCG Live</span>
+        </div>
+
+        <div class="field">
+          <label for="deck-input" class="visually-hidden">Lista del mazzo</label>
+          <textarea
+            id="deck-input"
+            rows="8"
+            spellcheck="false"
+            placeholder="4 Lillie's Determination MEG 119&#10;2 Charizard ex OBF 125&#10;1 Iron Leaves ex TEF 025/162"
+          ></textarea>
+          <span class="hint">
+            Le energie base senza set finiscono nei problemi. Per mazzi grandi usa
+            <strong>Apri in scheda</strong>: il popup si chiude se clicchi fuori.
+          </span>
+        </div>
+
+        <div class="inline-actions">
+          <button type="button" class="btn btn-primary" id="analyze-btn">Calcola anteprima</button>
+          <button type="button" class="btn" id="clear-btn">Pulisci</button>
+          <span id="run-status" class="status status-info" role="status" hidden></span>
+        </div>
+      </section>
+
+      <section id="progress-section" class="card panel progress-panel" aria-live="polite" hidden>
+        <div class="progress-row">
+          <span id="progress-label">Preparazione…</span>
+          <span id="progress-count"></span>
+        </div>
+        <progress id="progress-bar"></progress>
+      </section>
+
+      <section id="summary-section" class="card panel summary-panel" aria-label="Riepilogo" hidden>
+        <div class="summary-grid">
+          <div class="summary-item">
+            <span class="summary-label">Carte pronte</span>
+            <strong id="summary-cards">—</strong>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Totale anteprima</span>
+            <strong id="summary-total">—</strong>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Righe</span>
+            <strong id="summary-entries">—</strong>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Divise</span>
+            <strong id="summary-split">—</strong>
+          </div>
+        </div>
+        <p class="summary-note">
+          Il totale è la somma delle offerte selezionate, senza spedizione o commissioni.
+        </p>
+      </section>
+
+      <section id="problems-section" class="card panel" aria-labelledby="problems-title" hidden>
+        <div class="panel-heading compact">
+          <h2 id="problems-title">Problemi</h2>
+          <span id="problems-badge" class="badge badge-red">0</span>
+        </div>
+        <ul id="problems-list" class="problem-list"></ul>
+      </section>
+
+      <section id="warnings-section" class="card panel" aria-labelledby="warnings-title" hidden>
+        <div class="panel-heading compact">
+          <h2 id="warnings-title">Avvisi sui dati</h2>
+          <span id="warnings-badge" class="badge badge-amber">0</span>
+        </div>
+        <ul id="warnings-list" class="problem-list warning-list"></ul>
+      </section>
+
+      <section id="preview-section" class="preview-section" aria-labelledby="preview-title" hidden>
+        <div class="section-heading">
+          <h2 id="preview-title">Anteprima offerte</h2>
+          <span id="preview-badge" class="badge badge-neutral">0 righe</span>
+        </div>
+        <div id="preview-list" class="preview-list"></div>
+      </section>
+
+      <section id="cart-section" class="card panel cart-panel" aria-labelledby="cart-title" hidden>
+        <div class="panel-heading">
+          <div>
+            <h2 id="cart-title">Carrello CardTrader</h2>
+            <p class="panel-description" id="cart-description">
+              Controlla l'anteprima. L'aggiunta al carrello non effettua alcun acquisto.
+            </p>
+          </div>
+          <span class="badge badge-amber">Nessun acquisto</span>
+        </div>
+
+        <div class="cart-actions">
+          <button type="button" class="btn btn-gold" id="add-cart-btn" disabled>
+            Aggiungi al carrello
+          </button>
+          <button type="button" class="btn" id="copy-report" disabled>Copia report</button>
+        </div>
+
+        <div id="cart-status" class="status status-info cart-status" role="status" hidden></div>
+      </section>
+
+      <p class="footer-note">
+        Nessun acquisto automatico. Verifica sempre il carrello sul sito CardTrader.
+      </p>
+    </main>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
