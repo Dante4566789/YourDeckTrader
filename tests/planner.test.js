@@ -126,6 +126,38 @@ test('pianifica una carta e produce anteprima e totale senza toccare il carrello
   assert.ok(progress.some((event) => event.phase === 'done'));
 });
 
+test('un nome approssimativo viene pianificato con un avviso', async () => {
+  const { reference } = makeReference({
+    async loadBlueprints() {
+      return {
+        blueprints: [
+          {
+            id: 100,
+            name: "Boss's Orders - Ghetsis",
+            game_id: 2,
+            expansion_id: 10,
+            fixed_properties: { collector_number: '114' },
+            editable_properties: [],
+          },
+        ],
+      };
+    },
+  });
+  const { api } = makeApi();
+  const planner = createDeckPlanner({ api, reference });
+
+  const plan = await planner.plan({
+    text: "3 Boss's Orders MEG 114",
+    settings: { language: 'it', minCondition: 'Near Mint' },
+  });
+
+  assert.equal(plan.entries[0].status, 'ok');
+  assert.equal(plan.entries[0].blueprint.name, "Boss's Orders - Ghetsis");
+  assert.equal(plan.entries[0].blueprint.matchedBy, 'prefix');
+  assert.equal(plan.entries[0].warnings[0].code, 'NOME_APPROSSIMATIVO');
+  assert.match(plan.entries[0].warnings[0].message, /Boss's Orders - Ghetsis/);
+});
+
 test('una riga malformata finisce nei problemi senza chiamare le API', async () => {
   const { reference } = makeReference();
   const { api, calls } = makeApi();

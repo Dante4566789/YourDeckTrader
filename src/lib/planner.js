@@ -149,8 +149,16 @@ export function createDeckPlanner(options = {}) {
           name: found.blueprint.name,
           version: found.blueprint.version,
           expansionId: found.blueprint.expansion_id,
+          matchedBy: found.matchedBy,
         };
         planned.printField = found.printField;
+
+        if (found.matchedBy && found.matchedBy !== 'exact') {
+          planned.warnings.push({
+            code: 'NOME_APPROSSIMATIVO',
+            message: `Nome "${entry.name}" abbinato a "${found.blueprint.name}" (${found.matchedBy}). Verifica che sia la carta giusta.`,
+          });
+        }
 
         if (!marketplaceCache.has(found.blueprint.id)) {
           const payload = await api.getMarketplaceProducts(found.blueprint.id, {

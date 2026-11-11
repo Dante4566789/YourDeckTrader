@@ -94,8 +94,12 @@ Formato per riga: `<quantità> <nome carta> <codice espansione> <numero di stamp
 Per ogni carta:
 
 1. Il codice espansione viene risolto prima per codice esatto, poi tramite i mapping.
-2. Il blueprint viene cercato per nome e numero di stampa. Se il numero non è disponibile
-   nei dati CardTrader, la riga è segnalata; non viene fatto un fallback per solo nome.
+2. Il blueprint viene cercato per nome e numero di stampa. Prima si prova il nome esatto;
+   se non c'è, si cercano nomi con prefisso, contenimento o similarità (es. la lista
+   contiene `Boss's Orders` e CardTrader ha `Boss's Orders - Ghetsis`). Il numero di
+   stampa resta obbligatorio e la scelta approssimativa produce l'avviso
+   **NOME_APPROSSIMATIVO**. Se il numero non è disponibile nei dati CardTrader, la riga è
+   segnalata; non viene fatto un fallback per solo nome.
 3. Le offerte sono filtrate per:
    - `user.can_sell_via_hub === true` (CardTrader Zero);
    - `user.country_code` uguale a `IT` (confronto senza distinzione tra maiuscole e

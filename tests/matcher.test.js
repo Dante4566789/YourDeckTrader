@@ -6,6 +6,7 @@ import {
   extractPrintNumberCandidates,
   findBlueprint,
   findPokemonGame,
+  nameSimilarity,
   resolveExpansion,
   resolveEntriesExpansions,
   trimBlueprints,
@@ -218,6 +219,108 @@ test('findBlueprint segnala ambiguità senza bloccare la scelta', () => {
   assert.equal(result.blueprint.id, 5);
   assert.equal(result.ambiguous, true);
   assert.equal(result.alternatives.length, 1);
+});
+
+test('findBlueprint trova il nome base quando CardTrader aggiunge un suffisso', () => {
+  const index = createBlueprintIndex([
+    {
+      id: 351635,
+      name: "Boss's Orders - Ghetsis",
+      version: '114/132',
+      fixed_properties: { collector_number: '114' },
+    },
+  ]);
+
+  const result = findBlueprint(
+    index,
+    entry({
+      name: "Boss's Orders",
+      nameKey: 'bossorders',
+      setCode: 'MEG',
+      printNumber: '114',
+      printKey: '114',
+    })
+  );
+
+  assert.equal(result.status, 'ok');
+  assert.equal(result.blueprint.id, 351635);
+  assert.equal(result.matchedBy, 'prefix');
+  assert.equal(result.requestedName, "Boss's Orders");
+});
+
+test('il nome esatto resta preferito rispetto a un nome simile', () => {
+  const index = createBlueprintIndex([
+    {
+      id: 1,
+      name: "Boss's Orders",
+      fixed_properties: { collector_number: '114' },
+    },
+    {
+      id: 2,
+      name: "Boss's Orders - Ghetsis",
+      fixed_properties: { collector_number: '114' },
+    },
+  ]);
+
+  const result = findBlueprint(
+    index,
+    entry({ name: "Boss's Orders", nameKey: 'bossorders', printKey: '114' })
+  );
+
+  assert.equal(result.status, 'ok');
+  assert.equal(result.blueprint.id, 1);
+  assert.equal(result.matchedBy, 'exact');
+});
+
+test('il fallback per nome non scavalca il numero di stampa', () => {
+  const index = createBlueprintIndex([
+    {
+      id: 351635,
+      name: "Boss's Orders - Ghetsis",
+      fixed_properties: { collector_number: '114' },
+    },
+  ]);
+
+  const result = findBlueprint(
+    index,
+    entry({
+      name: "Boss's Orders",
+      nameKey: 'bossorders',
+      printKey: '115',
+      printNumber: '115',
+    })
+  );
+
+  assert.equal(result.status, 'not_found');
+  assert.equal(result.reason, 'number');
+  assert.match(result.message, /Nomi simili nel set/);
+  assert.match(result.message, /Boss's Orders - Ghetsis/);
+});
+
+test('nomi simili ma non compatibili non vengono abbinati', () => {
+  const index = createBlueprintIndex([
+    { id: 1, name: 'Mewtwo', fixed_properties: { collector_number: '58' } },
+  ]);
+
+  const result = findBlueprint(
+    index,
+    entry({ name: 'Mew', nameKey: 'mew', printKey: '58', printNumber: '58' })
+  );
+
+  assert.equal(result.status, 'not_found');
+  assert.equal(result.reason, 'name');
+});
+
+test('nameSimilarity riconosce prefisso e refuso', () => {
+  assert.equal(
+    nameSimilarity("Boss's Orders", "Boss's Orders - Ghetsis").kind,
+    'prefix'
+  );
+  assert.equal(
+    nameSimilarity('Lillies Determnation', "Lillie's Determination").kind,
+    'similar'
+  );
+  assert.equal(nameSimilarity('Mew', 'Mewtwo'), null);
 });
 
 test('trimBlueprints conserva solo i campi utili', () => {
