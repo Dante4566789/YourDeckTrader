@@ -2,14 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  blueprintFinish,
+  blueprintSearchNames,
   createBlueprintIndex,
   extractPrintNumberCandidates,
   findBlueprint,
+  findBlueprintVersionMatch,
   findPokemonGame,
   nameSimilarity,
   resolveExpansion,
   resolveEntriesExpansions,
   trimBlueprints,
+  versionMentionsSetNumber,
 } from '../src/lib/matcher.js';
 
 const games = [
@@ -321,6 +325,212 @@ test('nameSimilarity riconosce prefisso e refuso', () => {
     'similar'
   );
   assert.equal(nameSimilarity('Mew', 'Mewtwo'), null);
+});
+
+test('blueprintFinish riconosce Holo e Reverse da nome e versione', () => {
+  assert.equal(blueprintFinish({ name: 'Basic Psychic Energy - Holo' }), 'holo');
+  assert.equal(
+    blueprintFinish({ name: 'Basic Psychic Energy', version: 'Cosmos Holo | SVE005' }),
+    'holo'
+  );
+  assert.equal(
+    blueprintFinish({ name: 'Basic Psychic Energy', version: 'Reverse Holo | SVE 021' }),
+    'reverse'
+  );
+  assert.equal(blueprintFinish({ name: 'Basic Psychic Energy' }), null);
+});
+
+test('findBlueprint riconosce un blueprint Holo con numero uguale', () => {
+  const index = createBlueprintIndex([
+    {
+      id: 700013,
+      name: 'Basic Psychic Energy - Holo',
+      version: 'MEE 013',
+      fixed_properties: { collector_number: '013' },
+    },
+  ]);
+
+  const result = findBlueprint(
+    index,
+    entry({
+      name: 'Psychic Energy',
+      nameKey: 'psychicenergy',
+      setCode: 'MEE',
+      printNumber: '13',
+      printKey: '13',
+    })
+  );
+
+  assert.equal(result.status, 'ok');
+  assert.equal(result.blueprint.id, 700013);
+  assert.equal(result.finish, 'holo');
+});
+
+test('se la riga chiede Holo preferisce il blueprint Holo a parità di numero', () => {
+  const index = createBlueprintIndex([
+    {
+      id: 1,
+      name: 'Basic Psychic Energy',
+      version: 'SVE 013',
+      fixed_properties: { collector_number: '013' },
+    },
+    {
+      id: 2,
+      name: 'Basic Psychic Energy',
+      version: 'Cracked Ice Holo | Terapagos Ultra-Premium Collection | SVE 013',
+      fixed_properties: { collector_number: '013' },
+    },
+  ]);
+
+  const result = findBlueprint(
+    index,
+    entry({
+      name: 'Basic Psychic Energy - Holo',
+      nameKey: 'basicpsychicenergyholo',
+      setCode: 'SVE',
+      printNumber: '13',
+      printKey: '13',
+    })
+  );
+
+  assert.equal(result.status, 'ok');
+  assert.equal(result.blueprint.id, 2);
+  assert.equal(result.finish, 'holo');
+});
+
+test('senza richiesta esplicita preferisce la versione base', () => {
+  const index = createBlueprintIndex([
+    {
+      id: 1,
+      name: 'Basic Psychic Energy',
+      version: 'SVE 013',
+      fixed_properties: { collector_number: '013' },
+    },
+    {
+      id: 2,
+      name: 'Basic Psychic Energy',
+      version: 'Cracked Ice Holo | Terapagos Ultra-Premium Collection | SVE 013',
+      fixed_properties: { collector_number: '013' },
+    },
+  ]);
+
+  const result = findBlueprint(
+    index,
+    entry({
+      name: 'Basic Psychic Energy',
+      nameKey: 'basicpsychicenergy',
+      setCode: 'SVE',
+      printNumber: '13',
+      printKey: '13',
+    })
+  );
+
+  assert.equal(result.status, 'ok');
+  assert.equal(result.blueprint.id, 1);
+});
+
+test('versionMentionsSetNumber riconosce il set originale nella versione', () => {
+  assert.equal(versionMentionsSetNumber('Holo | MEE 013', 'MEE', '13'), true);
+  assert.equal(versionMentionsSetNumber('MEE 005', 'MEE', '13'), false);
+  assert.equal(versionMentionsSetNumber('Cosmos Holo | SVE005', 'SVE', '5'), true);
+  assert.equal(
+    versionMentionsSetNumber('30th Celebration Reverse | MEE 005', 'MEE', '5'),
+    true
+  );
+  assert.equal(versionMentionsSetNumber('MEE 013', 'MEG', '13'), false);
+});
+
+test('blueprintSearchNames rimuove la finitura e prova anche Basic', () => {
+  assert.deepEqual(blueprintSearchNames('Basic Psychic Energy - Holo'), [
+    'Basic Psychic Energy',
+    'Psychic Energy',
+  ]);
+  assert.deepEqual(blueprintSearchNames('Psychic Energy'), [
+    'Psychic Energy',
+    'Basic Psychic Energy',
+  ]);
+});
+
+test('findBlueprintVersionMatch trova 409562 tramite Holo | MEE 013', () => {
+  const searchResults = [
+    {
+      id: 352946,
+      name: 'Basic Psychic Energy',
+      version: 'MEE 005',
+      expansion_id: 4336,
+    },
+    {
+      id: 409562,
+      name: 'Basic Psychic Energy',
+      version: 'Holo | MEE 013',
+      expansion_id: 4679,
+    },
+    {
+      id: 402889,
+      name: 'Basic Psychic Energy',
+      version: 'Cosmos Holo | MEE 005',
+      expansion_id: 4336,
+    },
+  ];
+
+  const result = findBlueprintVersionMatch(
+    searchResults,
+    entry({
+      name: 'Basic Psychic Energy - Holo',
+      nameKey: 'basicpsychicenergyholo',
+      setCode: 'MEE',
+      printNumber: '13',
+      printKey: '13',
+    })
+  );
+
+  assert.equal(result.status, 'ok');
+  assert.equal(result.blueprint.id, 409562);
+  assert.equal(result.blueprint.version, 'Holo | MEE 013');
+  assert.equal(result.finish, 'holo');
+});
+
+test('le energie usano il fallback per nome quando il numero TCG Live non esiste', () => {
+  const index = createBlueprintIndex([
+    {
+      id: 352946,
+      name: 'Basic Psychic Energy',
+      version: 'MEE 005',
+      fixed_properties: { collector_number: '005' },
+    },
+  ]);
+
+  const result = findBlueprint(
+    index,
+    entry({
+      name: 'Psychic Energy',
+      nameKey: 'psychicenergy',
+      setCode: 'MEE',
+      printNumber: '13',
+      printKey: '13',
+    })
+  );
+
+  assert.equal(result.status, 'ok');
+  assert.equal(result.blueprint.id, 352946);
+  assert.equal(result.matchedBy, 'energy-name');
+  assert.equal(result.numberFallback, true);
+  assert.equal(result.finish, 'holo');
+  assert.equal(result.preferHolo, true);
+});
+
+test('il fallback per nome non si applica alle carte non energia', () => {
+  const index = createBlueprintIndex([
+    { id: 1, name: 'Pikachu', fixed_properties: { collector_number: '001' } },
+  ]);
+
+  const result = findBlueprint(
+    index,
+    entry({ name: 'Pikachu', nameKey: 'pikachu', printKey: '999', printNumber: '999' })
+  );
+
+  assert.equal(result.status, 'not_found');
+  assert.equal(result.reason, 'number');
 });
 
 test('trimBlueprints conserva solo i campi utili', () => {

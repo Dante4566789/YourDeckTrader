@@ -1,6 +1,7 @@
 import {
   expansionCodeKey,
   nameKey,
+  normalizeExpansionCode,
   normalizeName,
   normalizePrintNumber,
   printNumberKey,
@@ -127,6 +128,142 @@ function nameTokens(value) {
     .filter(Boolean);
 }
 
+// Parole che indicano la finitura, non il nome della carta. Vengono ignorate
+// nel confronto: "Psychic Energy" deve trovare "Basic Psychic Energy - Holo".
+const FINISH_TOKENS = new Set([
+  'holo',
+  'holofoil',
+  'foil',
+  'reverse',
+  'cosmos',
+  'cracked',
+  'ice',
+]);
+
+function baseNameTokens(value) {
+  return nameTokens(value).filter((token) => !FINISH_TOKENS.has(token));
+}
+
+function baseNameKey(value) {
+  return baseNameTokens(value).join('');
+}
+
+const REVERSE_PATTERN = /\breverse\b/i;
+const HOLO_PATTERN = /\b(?:holo|holofoil|foil)\b/i;
+
+/**
+ * Ricava la finitura dichiarata dal nome o dalla versione del blueprint.
+ * Esempi reali: "Cosmos Holo | SVE005", "Reverse Holo | SVE 021",
+ * "Energy Reverse Holo | 001/193".
+ */
+export function blueprintFinish(blueprint) {
+  for (const value of [blueprint?.name, blueprint?.version]) {
+    if (typeof value !== 'string') continue;
+    if (REVERSE_PATTERN.test(value)) return 'reverse';
+    if (HOLO_PATTERN.test(value)) return 'holo';
+  }
+  return null;
+}
+
+export function isEnergyName(value) {
+  return /\benergy\b/.test(normalizeName(value));
+}
+
+/**
+ * Nomi da provare sulla ricerca globale /blueprints.
+ * "Basic Psychic Energy - Holo" diventa ["Basic Psychic Energy", "Psychic Energy"].
+ */
+export function blueprintSearchNames(value) {
+  const cleaned = String(value ?? '')
+    .replace(
+      /\b(?:cracked\s+ice\s+holo|cosmos\s+holo|reverse\s+holo|reverse|holofoil|holo|foil)\b/gi,
+      ' '
+    )
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s|:-]+|[\s|:-]+$/g, '')
+    .trim();
+  if (!cleaned) return [];
+
+  const names = new Set([cleaned]);
+  if (isEnergyName(cleaned)) {
+    if (/^basic\s+/i.test(cleaned)) {
+      names.add(cleaned.replace(/^basic\s+/i, ''));
+    } else {
+      names.add(`Basic ${cleaned}`);
+    }
+  }
+  return [...names].filter(Boolean);
+}
+
+/**
+ * La versione di un blueprint può contenere il set e il numero originali
+ * anche quando la carta è stata spostata in un'espansione speciale:
+ * "Holo | MEE 013" dentro "30th Celebration".
+ */
+export function extractVersionPrintNumber(version, setCode) {
+  const text = String(version ?? '').toUpperCase();
+  const code = normalizeExpansionCode(setCode);
+  if (!text || !code) return null;
+
+  const index = text.indexOf(code);
+  if (index === -1) return null;
+
+  const rest = text.slice(index + code.length);
+  const match = rest.match(/([A-Z]{0,3}\d{1,5}[A-Z]?|\d{1,5}\/\d{1,4})/);
+  return match ? match[1] : null;
+}
+
+export function versionMentionsSetNumber(version, setCode, printNumber) {
+  const found = extractVersionPrintNumber(version, setCode);
+  if (!found) return false;
+  return printNumberKey(found) === printNumberKey(printNumber);
+}
+
+/**
+ * Cerca il blueprint giusto tra i risultati della ricerca globale, imponendo
+ * che la versione citi lo stesso set e numero della riga del mazzo.
+ */
+export function findBlueprintVersionMatch(blueprints, entry) {
+  const list = (Array.isArray(blueprints) ? blueprints : [])
+    .filter((blueprint) =>
+      versionMentionsSetNumber(blueprint?.version, entry.setCode, entry.printNumber)
+    )
+    .map((blueprint) => {
+      // I risultati di /blueprints non hanno fixed_properties: il numero è
+      // dentro la versione ("Holo | MEE 013"). Lo esponiamo per il matcher.
+      const number = extractVersionPrintNumber(blueprint.version, entry.setCode);
+      if (!number) return blueprint;
+      return {
+        ...blueprint,
+        fixed_properties: {
+          ...(blueprint.fixed_properties || {}),
+          collector_number: number,
+        },
+      };
+    });
+  if (!list.length) return null;
+
+  const index = createBlueprintIndex(list);
+  const found = findBlueprint(index, entry);
+  if (found.status === 'ok') return found;
+
+  const item = index.items[0];
+  if (list.length === 1 && item?.candidates.length) {
+    return okResult(
+      { ...item, matchedCandidate: item.candidates[0] },
+      {
+        matchedBy: 'version',
+        nameScore: 0,
+        requestedName: entry.name,
+        requestedFinish: blueprintFinish({ name: entry.name }),
+        crossExpansion: true,
+      }
+    );
+  }
+
+  return null;
+}
+
 function compactDistance(a, b) {
   if (a === b) return 0;
   if (!a.length) return b.length;
@@ -157,15 +294,23 @@ function compactDistance(a, b) {
  * la similarità non può cambiare la carta scelta.
  */
 export function nameSimilarity(queryName, candidateName) {
-  const queryKey = nameKey(queryName);
-  const candidateKey = nameKey(candidateName);
-  if (!queryKey || !candidateKey) return null;
-  if (queryKey === candidateKey) {
+  const rawQueryKey = nameKey(queryName);
+  const rawCandidateKey = nameKey(candidateName);
+  if (!rawQueryKey || !rawCandidateKey) return null;
+  if (rawQueryKey === rawCandidateKey) {
     return { kind: 'exact', score: 100 };
   }
 
-  const queryTokens = nameTokens(queryName);
-  const candidateTokens = nameTokens(candidateName);
+  // Confronto senza le parole di finitura (Holo, Reverse, Foil...).
+  const queryKey = baseNameKey(queryName);
+  const candidateKey = baseNameKey(candidateName);
+  if (!queryKey || !candidateKey) return null;
+  if (queryKey === candidateKey) {
+    return { kind: 'finish', score: 95 };
+  }
+
+  const queryTokens = baseNameTokens(queryName);
+  const candidateTokens = baseNameTokens(candidateName);
   const candidateSet = new Set(candidateTokens);
 
   if (
@@ -416,29 +561,87 @@ function describeNames(items, limit = 5) {
   });
 }
 
+function finishRank(blueprint, requestedFinish) {
+  const finish = blueprintFinish(blueprint);
+  if (!requestedFinish) return finish ? 1 : 0;
+  if (finish === requestedFinish) return 0;
+  if (requestedFinish === 'holo' && finish === 'reverse') return 1;
+  if (requestedFinish === 'reverse' && finish === 'holo') return 1;
+  return 2;
+}
+
 function okResult(chosen, extra = {}) {
+  const declaredFinish = blueprintFinish(chosen.blueprint);
+  const requestedFinish = extra.requestedFinish || null;
+  const finish = extra.finish || declaredFinish || null;
   return {
     status: 'ok',
     blueprint: chosen.blueprint,
     printField: chosen.matchedCandidate.field,
     printValue: chosen.matchedCandidate.value,
     candidates: chosen.candidates,
+    finish,
+    // Se il blueprint dichiara già Holo/Reverse, tutte le sue offerte sono
+    // quella variante: non vanno filtrate per pokemon_reverse. Il filtro
+    // serve solo quando la finitura è richiesta ma il blueprint è ambiguo.
+    finishFilter:
+      extra.finishFilter !== undefined
+        ? extra.finishFilter
+        : Boolean(requestedFinish && !declaredFinish),
     ambiguous: extra.ambiguous || false,
     alternatives: extra.alternatives || [],
     ...extra,
   };
 }
 
+/**
+ * Le energie sono un caso speciale: TCG Live può esportare 16 varianti
+ * (es. MEE 001-016) mentre CardTrader ha un solo blueprint per tipo
+ * (es. MEE 005) con offerte normali e reverse/holo. Se il numero non esiste
+ * ma il nome identifica un'unica carta nel set, usiamo quella con un avviso.
+ */
+function findEnergyFallback(index, entry) {
+  if (!isEnergyName(entry.name)) return null;
+
+  const groups = new Map();
+  for (const item of index?.items || []) {
+    const similarity = nameSimilarity(entry.name, item.blueprint?.name);
+    if (!similarity || similarity.score < 70) continue;
+    if (!item.candidates.length) continue;
+
+    const key = baseNameKey(item.blueprint?.name);
+    if (!key) continue;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ item, similarity });
+  }
+
+  // Deve esistere un solo nome (senza finitura) e un solo blueprint:
+  // altrimenti il numero resta l'unico modo affidabile per distinguere.
+  if (groups.size !== 1) return null;
+  const items = [...groups.values()][0];
+  if (items.length !== 1) return null;
+  return items[0];
+}
+
 export function findBlueprint(index, entry) {
   const candidatesForName = index?.byName?.get(entry.nameKey) || [];
+  // La finitura può essere scritta nella riga ("... - Holo") oppure essere
+  // già nel nome/versione del blueprint.
+  const requestedFinish = blueprintFinish({ name: entry.name });
 
-  // 1. Nome esatto (comportamento storico).
+  // 1. Nome esatto (comportamento storico), preferendo la finitura richiesta.
   const exactMatches = collectNumberMatches(candidatesForName, entry);
   if (exactMatches.length) {
-    exactMatches.sort((a, b) => Number(a.blueprint.id) - Number(b.blueprint.id));
+    exactMatches.sort(
+      (a, b) =>
+        finishRank(a.blueprint, requestedFinish) -
+          finishRank(b.blueprint, requestedFinish) ||
+        Number(a.blueprint.id) - Number(b.blueprint.id)
+    );
     return okResult(exactMatches[0], {
       matchedBy: 'exact',
       nameScore: 100,
+      requestedFinish,
       ambiguous: exactMatches.length > 1,
       alternatives: exactMatches.slice(1).map((match) => match.blueprint),
     });
@@ -471,6 +674,8 @@ export function findBlueprint(index, entry) {
   if (similarMatches.length) {
     similarMatches.sort(
       (a, b) =>
+        finishRank(a.blueprint, requestedFinish) -
+          finishRank(b.blueprint, requestedFinish) ||
         b.similarity.score - a.similarity.score ||
         Number(a.blueprint?.id) - Number(b.blueprint?.id)
     );
@@ -479,12 +684,36 @@ export function findBlueprint(index, entry) {
       matchedBy: chosen.similarity.kind,
       nameScore: chosen.similarity.score,
       requestedName: entry.name,
+      requestedFinish,
       ambiguous: similarMatches.length > 1,
       alternatives: similarMatches.slice(1).map((match) => match.blueprint),
     });
   }
 
-  // 3. Errori diagnostici.
+  // 3. Fallback per le energie: numero TCG Live non presente in CardTrader.
+  const energy = findEnergyFallback(index, entry);
+  if (energy) {
+    const declaredFinish = blueprintFinish(energy.item.blueprint);
+    const chosen = {
+      ...energy.item,
+      matchedCandidate: energy.item.candidates[0],
+    };
+    return okResult(chosen, {
+      matchedBy: 'energy-name',
+      nameScore: energy.similarity.score,
+      requestedName: entry.name,
+      requestedFinish,
+      numberFallback: true,
+      requestedPrintNumber: entry.printNumber,
+      // Se il blueprint non dichiara la finitura, il numero TCG Live più alto
+      // indica la variante Holo/Reverse (es. MEE 013 -> reverse holo).
+      finish: declaredFinish || requestedFinish || 'holo',
+      finishFilter: !declaredFinish,
+      preferHolo: !declaredFinish,
+    });
+  }
+
+  // 4. Errori diagnostici.
   if (!candidatesForName.length) {
     if (scored.length) {
       const similarItems = scored.map(({ item }) => item);

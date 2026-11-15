@@ -85,7 +85,10 @@ Formato per riga: `<quantità> <nome carta> <codice espansione> <numero di stamp
 
 - Il numero di stampa è quello impresso sulla carta, non l'ID blueprint CardTrader.
 - Gli zeri iniziali e il suffisso `/162` vengono ignorati nel confronto.
-- Intestazioni, righe vuote, `Total Cards` e decorazioni PTCGO vengono ignorate.
+- Intestazioni di sezione (`Pokémon: 25`, `Trainer: 28`, `Trainers: 28`, `Energy: 7`,
+  `Allenatori: 28`, `Energia: 7`, `Total Cards`, `Totale Carte`), righe vuote e
+  decorazioni PTCGO vengono ignorate automaticamente, anche con accenti decomposti,
+  bullet o emoji iniziali.
 - Le energie base senza set (es. `4 Basic Fire Energy`) finiscono nei problemi, come le
   altre righe incomplete.
 
@@ -121,6 +124,44 @@ Per ogni carta:
 I conteggi di ogni passaggio sono nel report e nei messaggi di problema:
 `156 offerte, 74 Zero, 33 Zero in Italia`. Se non ci sono offerte Zero italiane, il
 messaggio elenca i paesi in cui sono disponibili le offerte Zero.
+
+### Carte Holo ed energie
+
+CardTrader rappresenta la finitura in due modi:
+
+- parole nel nome o nella versione del blueprint (`Holo`, `Reverse Holo`,
+  `Cosmos Holo`, `Cracked Ice Holo`, ...);
+- proprietà booleana `properties_hash.pokemon_reverse` sulle singole offerte.
+
+L'estensione riconosce entrambi. Se la riga contiene `Holo` o `Reverse Holo`, preferisce
+il blueprint con quella finitura e, quando il blueprint contiene sia copie normali sia
+reverse, scarta le copie normali. Senza richiesta esplicita continua a preferire la
+versione base non foil.
+
+Le energie sono un caso particolare. TCG Live può esportare 16 varianti (per esempio
+`MEE 001`-`MEE 016`), mentre CardTrader può distribuirle in espansioni diverse:
+
+- `Basic Psychic Energy` `MEE 005` nell'espansione *Mega Evolution Energies*;
+- `Basic Psychic Energy` `Holo | MEE 013` nell'espansione *30th Celebration*
+  (blueprint 409562).
+
+L'estensione cerca quindi il blueprint anche fuori dal set indicato, usando la ricerca
+globale `GET /blueprints?name=...` e verificando che la versione contenga lo stesso set e
+numero (`MEE 013`). Se lo trova, usa il blueprint corretto e mostra l'avviso
+**BLUEPRINT_IN_ALTRA_ESPANSIONE**. Solo se la ricerca globale non trova nulla usa il
+fallback per nome nell'espansione scelta, con avviso **NUMERO_STAMPA_APPROSSIMATIVO**.
+Esempio verificato:
+
+```text
+1 Psychic Energy MEE 13
+→ Basic Psychic Energy, Holo | MEE 013, blueprint 409562
+→ espansione 30th Celebration
+→ offerta italiana CardTrader Zero da €0,11
+```
+
+Quando il blueprint dichiara già `Holo` nella versione, tutte le sue offerte sono Holo e
+non vengono filtrate per `pokemon_reverse`; il filtro serve solo per i blueprint ambigui
+che contengono sia copie normali sia reverse.
 
 La risposta marketplace di CardTrader contiene al massimo le 25 offerte più economiche per
 blueprint. Prezzi e disponibilità possono cambiare tra anteprima e aggiunta: eventuali

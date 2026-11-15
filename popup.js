@@ -262,6 +262,11 @@ function renderEntry(planned) {
   } else {
     badges.append(create('span', 'badge badge-red', 'Problema'));
   }
+  if (planned.blueprint?.finish === 'holo') {
+    badges.append(create('span', 'badge badge-neutral', 'Holo'));
+  } else if (planned.blueprint?.finish === 'reverse') {
+    badges.append(create('span', 'badge badge-neutral', 'Reverse'));
+  }
   head.append(badges);
   article.append(head);
 
@@ -270,7 +275,12 @@ function renderEntry(planned) {
     metaParts.push(`${planned.expansion.name} (${planned.expansion.code})`);
   }
   if (planned.blueprint) {
-    metaParts.push(`blueprint #${planned.blueprint.id}`);
+    const version = planned.blueprint.version
+      ? ` (${planned.blueprint.version})`
+      : '';
+    metaParts.push(
+      `blueprint #${planned.blueprint.id} · ${planned.blueprint.name}${version}`
+    );
   }
   if (planned.printField) {
     metaParts.push(`numero da ${planned.printField}`);

@@ -5,10 +5,13 @@ import {
   normalizePrintNumber,
   normalizeWhitespace,
   printNumberKey,
+  stripDiacritics,
 } from './normalize.js';
 
+// Dopo stripDiacritics "Pokémon" diventa "Pokemon": il pattern copre anche
+// plurali, italiano e le intestazioni dei deck list Limitless/PTCGL.
 const HEADER_PATTERN =
-  /^(?:[*#\s-]*)(?:pok[eé]mon|trainer(?: cards)?|energy|total cards|deck(?: list)?|pok[eé]mon trading card game deck list)\b/i;
+  /^(?:[*#\s-]*)(?:pokemon|trainers?(?: cards)?|allenator(?:e|i)|energ(?:y|ies|ia|ie)|total cards|totale carte|deck(?: list)?|mazzo|sideboard|riserve?|pokemon trading card game deck list)\b/i;
 
 const DECORATION_PATTERN = /^[*#=\-\s]+$/;
 
@@ -56,14 +59,23 @@ function stripLeadingBullet(value) {
   return value.replace(/^[*•]\s+/, '');
 }
 
+function headerCandidate(line) {
+  // Rimuove bullet, emoji, zero-width space e altri caratteri iniziali non
+  // alfanumerici; poi normalizza gli accenti (anche decomposti in NFD).
+  return stripDiacritics(line)
+    .replace(/^[^\p{L}\p{N}]+/u, '')
+    .replace(/^[*#\s-]+/, '')
+    .trim();
+}
+
 function isIgnoredLine(line) {
   if (!line) return true;
   if (DECORATION_PATTERN.test(line)) return true;
-  if (HEADER_PATTERN.test(line)) return true;
   if (/^\/\//.test(line)) return true;
 
-  // Intestazioni generiche tipo "Pokémon: 12" o "Trainer - 20".
-  if (/^[A-Za-zÀ-ÿ ]+\s*[:=-]\s*\d+\s*$/.test(line)) return true;
+  const candidate = headerCandidate(line);
+  if (!candidate) return true;
+  if (HEADER_PATTERN.test(candidate)) return true;
   return false;
 }
 

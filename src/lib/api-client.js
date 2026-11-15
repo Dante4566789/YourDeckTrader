@@ -205,6 +205,27 @@ export function createApiClient(options = {}) {
     return asList(payload, { label: 'Risposta inattesa da /expansions' });
   }
 
+  /**
+   * Ricerca globale per nome. L'endpoint /blueprints non è nella reference
+   * principale ma è in sola lettura e restituisce i blueprint di tutti i set:
+   * serve per le carte spostate in espansioni speciali (es. 30th Celebration)
+   * la cui versione contiene ancora il codice originale, come "MEE 013".
+   */
+  async function searchBlueprintsByName(name, { gameId, limit = 100, page = 1 } = {}) {
+    const queryText = String(name ?? '').trim();
+    if (!queryText) return [];
+
+    const payload = await request('/blueprints', {
+      query: {
+        name: queryText,
+        game_id: gameId ? Number(gameId) : undefined,
+        limit: Math.max(1, Math.min(Number(limit) || 100, 100)),
+        page: Math.max(1, Number(page) || 1),
+      },
+    });
+    return asList(payload, { label: 'Risposta inattesa da /blueprints' });
+  }
+
   async function getBlueprints(expansionId) {
     if (!Number.isInteger(Number(expansionId)) || Number(expansionId) <= 0) {
       throw new ApiError({
@@ -295,6 +316,7 @@ export function createApiClient(options = {}) {
     getInfo,
     getGames,
     getExpansions,
+    searchBlueprintsByName,
     getBlueprints,
     getMarketplaceProducts,
     addToCart,

@@ -1,7 +1,9 @@
 import { parseDeckList } from './deck-parser.js';
 import {
+  blueprintSearchNames,
   createBlueprintIndex,
   findBlueprint,
+  findBlueprintVersionMatch,
   resolveEntriesExpansions,
 } from './matcher.js';
 import {
@@ -76,7 +78,42 @@ export function createDeckPlanner(options = {}) {
 
     const blueprintIndexes = new Map();
     const marketplaceCache = new Map();
+    const blueprintSearchCache = new Map();
     const plannedEntries = [];
+
+    async function findCrossExpansionBlueprint(entry) {
+      if (typeof api.searchBlueprintsByName !== 'function') return null;
+
+      const names = blueprintSearchNames(entry.name);
+      if (!names.length) return null;
+
+      const cacheKey = `${gameId}:${names.join('|').toLowerCase()}`;
+      if (!blueprintSearchCache.has(cacheKey)) {
+        const results = [];
+        const seen = new Set();
+        try {
+          for (const name of names) {
+            const found = await api.searchBlueprintsByName(name, {
+              gameId,
+              limit: 100,
+            });
+            for (const blueprint of found) {
+              if (!blueprint || seen.has(blueprint.id)) continue;
+              seen.add(blueprint.id);
+              results.push(blueprint);
+            }
+          }
+        } catch {
+          // La ricerca globale è un fallback: se non è disponibile si
+          // continua con la corrispondenza nell'espansione scelta.
+          blueprintSearchCache.set(cacheKey, []);
+          return null;
+        }
+        blueprintSearchCache.set(cacheKey, results);
+      }
+
+      return findBlueprintVersionMatch(blueprintSearchCache.get(cacheKey), entry);
+    }
 
     let index = 0;
     for (const entry of parsed.entries) {
@@ -130,7 +167,21 @@ export function createDeckPlanner(options = {}) {
           blueprintIndexes.set(expansion.id, createBlueprintIndex(blueprints));
         }
 
-        const found = findBlueprint(blueprintIndexes.get(expansion.id), entry);
+        const localFound = findBlueprint(blueprintIndexes.get(expansion.id), entry);
+
+        // Se il numero non esiste nel set scelto (o è stato trovato solo con
+        // il fallback energia), cerca il blueprint in tutti i set tramite la
+        // versione: es. "Holo | MEE 013" vive in "30th Celebration".
+        let found = localFound;
+        let crossExpansion = false;
+        if (localFound.status !== 'ok' || localFound.numberFallback) {
+          const globalFound = await findCrossExpansionBlueprint(entry);
+          if (globalFound) {
+            found = globalFound;
+            crossExpansion = true;
+          }
+        }
+
         if (found.status !== 'ok') {
           planned.problems.push(
             entryProblem(
@@ -150,13 +201,37 @@ export function createDeckPlanner(options = {}) {
           version: found.blueprint.version,
           expansionId: found.blueprint.expansion_id,
           matchedBy: found.matchedBy,
+          finish: found.finish || null,
         };
         planned.printField = found.printField;
 
-        if (found.matchedBy && found.matchedBy !== 'exact') {
+        if (
+          found.matchedBy &&
+          found.matchedBy !== 'exact' &&
+          found.matchedBy !== 'energy-name' &&
+          !crossExpansion
+        ) {
           planned.warnings.push({
             code: 'NOME_APPROSSIMATIVO',
             message: `Nome "${entry.name}" abbinato a "${found.blueprint.name}" (${found.matchedBy}). Verifica che sia la carta giusta.`,
+          });
+        }
+
+        if (crossExpansion) {
+          const targetExpansion = (Array.isArray(expansions) ? expansions : []).find(
+            (item) => Number(item.id) === Number(found.blueprint.expansion_id)
+          );
+          planned.blueprint.expansionName = targetExpansion?.name || null;
+          planned.warnings.push({
+            code: 'BLUEPRINT_IN_ALTRA_ESPANSIONE',
+            message: `Il numero ${entry.printNumber} di "${entry.name}" è nel blueprint ${found.blueprint.id} "${found.blueprint.name}" (${found.blueprint.version || '—'}) dell'espansione ${targetExpansion?.name || found.blueprint.expansion_id}, non in ${expansion.name}. Verifica che sia la carta giusta.`,
+          });
+        }
+
+        if (found.numberFallback) {
+          planned.warnings.push({
+            code: 'NUMERO_STAMPA_APPROSSIMATIVO',
+            message: `Numero ${found.requestedPrintNumber} non presente in CardTrader per "${found.blueprint.name}": uso ${found.blueprint.version || found.printValue}. Variante ${found.finish || 'disponibile'}. Verifica che sia la carta giusta.`,
           });
         }
 
@@ -176,6 +251,9 @@ export function createDeckPlanner(options = {}) {
           quantity: entry.quantity,
           language,
           minCondition,
+          finish: found.finishFilter
+            ? found.finish || found.requestedFinish
+            : null,
         });
 
         planned.selection = selection;

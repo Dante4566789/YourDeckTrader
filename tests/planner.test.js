@@ -29,6 +29,7 @@ function offer(id, overrides = {}) {
     condition = 'Near Mint',
     language = 'it',
     foil = false,
+    reverse = false,
     hub = true,
   } = overrides;
   return {
@@ -40,6 +41,7 @@ function offer(id, overrides = {}) {
       condition,
       pokemon_language: language,
       pokemon_foil: foil,
+      pokemon_reverse: reverse,
     },
     user: {
       id: 1,
@@ -156,6 +158,156 @@ test('un nome approssimativo viene pianificato con un avviso', async () => {
   assert.equal(plan.entries[0].blueprint.matchedBy, 'prefix');
   assert.equal(plan.entries[0].warnings[0].code, 'NOME_APPROSSIMATIVO');
   assert.match(plan.entries[0].warnings[0].message, /Boss's Orders - Ghetsis/);
+});
+
+test('cerca il blueprint MEE 013 in un\'altra espansione tramite la versione', async () => {
+  const { reference } = makeReference({
+    async loadPokemonExpansions() {
+      return {
+        expansions: [
+          {
+            id: 4336,
+            game_id: 2,
+            code: 'MEE',
+            name: 'Mega Evolution Energies',
+          },
+          {
+            id: 4679,
+            game_id: 2,
+            code: '30c',
+            name: '30th Celebration',
+          },
+        ],
+      };
+    },
+    async loadBlueprints() {
+      return {
+        blueprints: [
+          {
+            id: 352946,
+            name: 'Basic Psychic Energy',
+            version: 'MEE 005',
+            game_id: 2,
+            expansion_id: 4336,
+            fixed_properties: { collector_number: '005' },
+            editable_properties: [],
+          },
+        ],
+      };
+    },
+  });
+  const { api } = makeApi({
+    async searchBlueprintsByName() {
+      return [
+        {
+          id: 352946,
+          name: 'Basic Psychic Energy',
+          version: 'MEE 005',
+          game_id: 2,
+          expansion_id: 4336,
+        },
+        {
+          id: 409562,
+          name: 'Basic Psychic Energy',
+          version: 'Holo | MEE 013',
+          game_id: 2,
+          expansion_id: 4679,
+        },
+      ];
+    },
+    async getMarketplaceProducts(blueprintId) {
+      return {
+        [blueprintId]: [
+          offer(1, { cents: 11, quantity: 2, reverse: false }),
+          offer(2, { cents: 13, quantity: 2, reverse: true }),
+        ],
+      };
+    },
+  });
+  const planner = createDeckPlanner({ api, reference });
+
+  const plan = await planner.plan({
+    text: '1 Basic Psychic Energy - Holo MEE 13',
+    settings: { language: 'it', minCondition: 'Near Mint' },
+  });
+
+  const planned = plan.entries[0];
+  assert.equal(planned.status, 'ok');
+  assert.equal(planned.blueprint.id, 409562);
+  assert.equal(planned.blueprint.expansionId, 4679);
+  assert.equal(planned.blueprint.finish, 'holo');
+  assert.ok(
+    planned.warnings.some(
+      (warning) => warning.code === 'BLUEPRINT_IN_ALTRA_ESPANSIONE'
+    )
+  );
+  // Il blueprint 409562 dichiara già "Holo" nella versione: tutte le sue
+  // offerte sono Holo e non vanno filtrate per pokemon_reverse.
+  assert.equal(planned.blueprint.finish, 'holo');
+  assert.equal(planned.selection.items[0].unitPriceCents, 11);
+});
+
+test('le energie Holo usano il fallback numero e scelgono la variante reverse', async () => {
+  const { reference } = makeReference({
+    async loadPokemonExpansions() {
+      return {
+        expansions: [
+          {
+            id: 4336,
+            game_id: 2,
+            code: 'MEE',
+            name: 'Mega Evolution Energies',
+          },
+        ],
+      };
+    },
+    async loadBlueprints() {
+      return {
+        blueprints: [
+          {
+            id: 352946,
+            name: 'Basic Psychic Energy',
+            version: 'MEE 005',
+            game_id: 2,
+            expansion_id: 4336,
+            fixed_properties: { collector_number: '005' },
+            editable_properties: [],
+          },
+        ],
+      };
+    },
+  });
+  const { api } = makeApi({
+    async getMarketplaceProducts(blueprintId) {
+      return {
+        [blueprintId]: [
+          offer(1, { cents: 11, quantity: 2, reverse: false }),
+          offer(2, { cents: 13, quantity: 2, reverse: true }),
+        ],
+      };
+    },
+  });
+  const planner = createDeckPlanner({ api, reference });
+
+  const plan = await planner.plan({
+    text: '1 Psychic Energy MEE 13',
+    settings: { language: 'it', minCondition: 'Near Mint' },
+  });
+
+  const planned = plan.entries[0];
+  assert.equal(planned.status, 'ok');
+  assert.equal(planned.blueprint.finish, 'holo');
+  assert.ok(
+    planned.warnings.some(
+      (warning) => warning.code === 'NUMERO_STAMPA_APPROSSIMATIVO'
+    )
+  );
+  assert.equal(
+    planned.warnings.some((warning) => warning.code === 'NOME_APPROSSIMATIVO'),
+    false
+  );
+  assert.equal(planned.selection.items[0].unitPriceCents, 13);
+  assert.equal(planned.selection.items[0].foil, true);
 });
 
 test('una riga malformata finisce nei problemi senza chiamare le API', async () => {

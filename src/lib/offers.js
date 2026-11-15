@@ -285,7 +285,7 @@ function exclusionSummary(excluded, total) {
   if (excluded.vacation) parts.push(`${excluded.vacation} venditori in ferie`);
   if (excluded.graded) parts.push(`${excluded.graded} carte gradate`);
   if (excluded.bundle) parts.push(`${excluded.bundle} bundle non singoli`);
-  if (excluded.foil) parts.push(`${excluded.foil} foil/reverse`);
+  if (excluded.foil) parts.push(`${excluded.foil} variante errata`);
   if (excluded.language) parts.push(`${excluded.language} altra lingua`);
   if (excluded.condition) parts.push(`${excluded.condition} sotto la condizione minima`);
   if (excluded.conditionUnknown) parts.push(`${excluded.conditionUnknown} senza condizione`);
@@ -308,6 +308,7 @@ export function selectOffersForEntry(options) {
     language = 'it',
     minCondition = 'Near Mint',
     countryCode = 'IT',
+    finish = null,
   } = options || {};
 
   const requested = asNumber(quantity);
@@ -329,6 +330,14 @@ export function selectOffersForEntry(options) {
   if (!/^[A-Z]{2}$/.test(requestedCountry)) {
     throw new TypeError('Il paese richiesto non è valido.');
   }
+
+  const finishKey = String(finish ?? '').trim().toLowerCase();
+  const requestedFinish =
+    finishKey === 'holo' || finishKey === 'reverse' || finishKey === 'foil'
+      ? 'holo'
+      : finishKey === 'nonfoil' || finishKey === 'normal'
+        ? 'nonfoil'
+        : null;
 
   const rawOffers = Array.isArray(offers) ? offers : [];
   const schema = detectOfferSchema(rawOffers);
@@ -387,11 +396,22 @@ export function selectOffersForEntry(options) {
       continue;
     }
 
-    if (offer.foil === true) {
-      excluded.foil += 1;
-      continue;
+    if (requestedFinish === 'holo') {
+      // Holo/Reverse richiesto: scarta le copie normali; se la risposta non
+      // espone il dato, l'offerta viene inclusa con un avviso.
+      if (offer.foil === false) {
+        excluded.foil += 1;
+        continue;
+      }
+      if (offer.foil === null) foilUnverified += 1;
+    } else {
+      // Comportamento predefinito e richiesta non-foil: scarta holo/reverse.
+      if (offer.foil === true) {
+        excluded.foil += 1;
+        continue;
+      }
+      if (offer.foil === null) foilUnverified += 1;
     }
-    if (offer.foil === null) foilUnverified += 1;
 
     if (!schema.languageField) {
       languageUnverified += 1;
@@ -463,6 +483,7 @@ export function selectOffersForEntry(options) {
       // Il parametro server foil=false svuota la risposta: il filtro è solo
       // lato client, quindi non è mai "serverFiltered".
       serverFiltered: false,
+      requested: requestedFinish,
       unverifiedOffers: foilUnverified,
       verified: schema.foilFields.length > 0 && foilUnverified === 0,
     },
@@ -480,12 +501,14 @@ export function selectOffersForEntry(options) {
     warnings.push({
       code: PROBLEM.DATI_NON_DISPONIBILI,
       message:
-        'La risposta non espone foil/reverse: non è possibile verificare che le offerte non siano foil.',
+        requestedFinish === 'holo'
+          ? 'La risposta non espone holo/reverse: non è possibile verificare la variante, ma il blueprint identifica già la carta Holo.'
+          : 'La risposta non espone foil/reverse: non è possibile verificare che le offerte non siano foil.',
     });
   } else if (foilUnverified > 0) {
     warnings.push({
       code: PROBLEM.DATI_NON_DISPONIBILI,
-      message: `${foilUnverified} offerte non indicano chiaramente foil/reverse e sono state incluse.`,
+      message: `${foilUnverified} offerte non indicano chiaramente la variante holo/reverse e sono state incluse.`,
     });
   }
   if (!schema.conditionField) {

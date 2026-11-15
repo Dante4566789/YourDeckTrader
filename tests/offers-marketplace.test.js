@@ -209,6 +209,60 @@ test('combina più offerte italiane solo quando nessuna copre la quantità', () 
   assert.equal(result.totalCents, 250);
 });
 
+test('finish holo sceglie la variante reverse anche se costa di più', () => {
+  const result = select(
+    [
+      offer({ cents: 10, quantity: 2, reverse: false }),
+      offer({ cents: 13, quantity: 2, reverse: true }),
+    ],
+    { quantity: 1, finish: 'holo' }
+  );
+
+  assert.equal(result.status, 'ok');
+  assert.equal(result.items[0].unitPriceCents, 13);
+  assert.equal(result.items[0].foil, true);
+  assert.equal(result.diagnostics.foil.requested, 'holo');
+});
+
+test('finish nonfoil scarta la variante holo', () => {
+  const result = select(
+    [
+      offer({ cents: 10, quantity: 2, reverse: true }),
+      offer({ cents: 13, quantity: 2, reverse: false }),
+    ],
+    { quantity: 1, finish: 'nonfoil' }
+  );
+
+  assert.equal(result.status, 'ok');
+  assert.equal(result.items[0].unitPriceCents, 13);
+  assert.equal(result.items[0].foil, false);
+});
+
+test('finish holo senza campo foil include le offerte con avviso', () => {
+  const result = select(
+    [
+      {
+        id: 1,
+        blueprint_id: BLUEPRINT_ID,
+        quantity: 2,
+        price: { cents: 10, currency: 'EUR' },
+        properties_hash: { condition: 'Near Mint', pokemon_language: 'it' },
+        user: {
+          id: 7,
+          username: 'seller',
+          country_code: 'IT',
+          can_sell_via_hub: true,
+        },
+      },
+    ],
+    { quantity: 1, finish: 'holo' }
+  );
+
+  assert.equal(result.status, 'ok');
+  assert.equal(result.items[0].unitPriceCents, 10);
+  assert.ok(result.warnings.some((warning) => /non espone holo/.test(warning.message)));
+});
+
 test('il confronto del paese ignora maiuscole e minuscole', () => {
   const result = select([offer({ cents: 42, country: 'it' })], { quantity: 1 });
   assert.equal(result.status, 'ok');

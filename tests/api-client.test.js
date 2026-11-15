@@ -91,6 +91,35 @@ test('marketplace/products passa la lingua, non invia foil=false e usa la coda m
   assert.deepEqual(kinds, ['marketplace']);
 });
 
+test('searchBlueprintsByName usa /blueprints con nome e gioco', async () => {
+  const { scheduler } = makeScheduler();
+  let captured;
+  const api = createApiClient({
+    token: 'tok',
+    scheduler,
+    fetchImpl: async (url, init) => {
+      captured = { url: url.toString(), init };
+      return jsonResponse([
+        { id: 409562, name: 'Basic Psychic Energy', version: 'Holo | MEE 013' },
+      ]);
+    },
+  });
+
+  const result = await api.searchBlueprintsByName('Basic Psychic Energy', {
+    gameId: 5,
+  });
+
+  assert.deepEqual(result, [
+    { id: 409562, name: 'Basic Psychic Energy', version: 'Holo | MEE 013' },
+  ]);
+  const parsed = new URL(captured.url);
+  assert.equal(parsed.pathname, '/api/v2/blueprints');
+  assert.equal(parsed.searchParams.get('name'), 'Basic Psychic Energy');
+  assert.equal(parsed.searchParams.get('game_id'), '5');
+  assert.equal(parsed.searchParams.get('limit'), '100');
+  assert.equal(parsed.searchParams.get('page'), '1');
+});
+
 test('cart/add invia via_cardtrader_zero=true e gli indirizzi API', async () => {
   const { scheduler } = makeScheduler();
   let captured;

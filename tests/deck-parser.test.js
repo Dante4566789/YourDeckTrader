@@ -43,6 +43,86 @@ test('ignora intestazioni, Total Cards e righe vuote', () => {
   assert.equal(result.ignored.length, 4);
 });
 
+test('ignora le intestazioni di sezione nelle varianti Limitless/PTCGL', () => {
+  const text = [
+    'Pokémon: 25',
+    '4 Poltchageist PBL 5',
+    '',
+    'Trainers: 28',
+    "3 Boss's Orders MEG 114",
+    '',
+    '• Energia: 7',
+    '2 Psychic Energy MEE 13',
+    '',
+    'Totale Carte (60)',
+  ].join('\n');
+
+  const result = parseDeckList(text);
+  assert.equal(result.entries.length, 3);
+  assert.equal(result.problems.length, 0);
+  assert.deepEqual(
+    result.ignored.map((item) => item.raw),
+    ['Pokémon: 25', 'Trainers: 28', '• Energia: 7', 'Totale Carte (60)']
+  );
+});
+
+test('riconosce Pokémon con accento decomposto (NFD)', () => {
+  const text = 'Poke\u0301mon: 1\n4 Poltchageist PBL 5';
+  const result = parseDeckList(text);
+  assert.equal(result.entries.length, 1);
+  assert.equal(result.problems.length, 0);
+  assert.equal(result.ignored[0].raw.normalize('NFC'), 'Pokémon: 1');
+});
+
+test('una lista Limitless completa non produce problemi per le intestazioni', () => {
+  const text = `Pokémon: 25
+4 Poltchageist PBL 5
+2 Sinistcha PBL 6
+4 Dhelmise PBL 39
+3 Dunsparce JTG 120
+2 Dudunsparce TEF 129
+2 Shuppet PBL 33
+4 Banette PBL 34
+2 Lillie's Clefairy ex JTG 56
+1 Bloodmoon Ursaluna ex TWM 141
+1 Latias ex SSP 76
+
+Trainer: 28
+4 Lillie's Determination MEG 119
+4 Gwynn PBL 78
+3 Boss's Orders MEG 114
+2 Explorer's Guidance TEF 147
+1 Black Belt's Training JTG 143
+4 Ultra Ball MEG 131
+4 Poké Pad POR 81
+3 Night Stretcher ASC 196
+3 Prism Tower CRI 80
+
+Energy: 7
+4 Telepathic Psychic Energy POR 88
+2 Psychic Energy MEE 13
+1 Legacy Energy TWM 167
+`;
+
+  const result = parseDeckList(text);
+  assert.equal(result.entries.length, 22);
+  assert.equal(result.problems.length, 0);
+  assert.equal(
+    result.entries.reduce((sum, entry) => sum + entry.quantity, 0),
+    60
+  );
+  assert.deepEqual(
+    result.ignored.map((item) => item.raw),
+    ['Pokémon: 25', 'Trainer: 28', 'Energy: 7']
+  );
+});
+
+test('una carta che inizia con Pokémon non viene scambiata per intestazione', () => {
+  const result = parseDeckList('4 Pokémon Catcher SVI 187');
+  assert.equal(result.entries.length, 1);
+  assert.equal(result.entries[0].name, 'Pokémon Catcher');
+});
+
 test('normalizza zeri iniziali e suffisso /162', () => {
   const result = parseDeckList('1 Iron Leaves ex TEF 025/162');
   assert.equal(result.entries[0].printNumber, '25');

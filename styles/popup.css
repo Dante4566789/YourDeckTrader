@@ -1,7 +1,13 @@
 .popup-body {
-  width: 460px;
-  max-height: 600px;
+  /* Chrome limita i popup a 800x600 CSS px. Larghezza massima e altezza
+     ridotta: il contenuto più lungo scorre dentro la finestra. */
+  width: 800px;
+  max-width: 500px;
+  min-width: 500px;
+  height: 520px;
   overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
   background:
     radial-gradient(circle at top left, rgba(231, 169, 39, 0.11), transparent 20rem),
     var(--bg);
@@ -10,6 +16,7 @@
 .popup-body.view-tab {
   width: auto;
   max-width: 1100px;
+  height: auto;
   max-height: none;
   margin: 0 auto;
 }
@@ -18,8 +25,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 14px 14px 10px;
+  gap: 14px;
+  padding: 16px 18px 12px;
   position: sticky;
   top: 0;
   z-index: 20;
@@ -29,11 +36,11 @@
 }
 
 .popup-header .brand-title {
-  font-size: 16px;
+  font-size: 17px;
 }
 
 .popup-header .brand-subtitle {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .popup-header .brand-mark {
@@ -58,12 +65,12 @@
 
 .popup-main {
   display: grid;
-  gap: 12px;
-  padding: 12px 14px 22px;
+  gap: 14px;
+  padding: 14px 18px 26px;
 }
 
 .popup-main .panel {
-  padding: 15px;
+  padding: 17px;
 }
 
 .popup-main .panel-heading {
@@ -76,11 +83,11 @@
 }
 
 .popup-main .panel h2 {
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .popup-main .panel-description {
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .setup-banner {
@@ -96,10 +103,10 @@
 }
 
 .deck-panel textarea {
-  min-height: 144px;
+  min-height: 176px;
   resize: vertical;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.55;
 }
 
@@ -195,7 +202,7 @@
   display: flex;
   align-items: flex-start;
   gap: 7px;
-  font-size: 12px;
+  font-size: 12.5px;
   border-left: 3px solid var(--red);
   padding: 5px 0 5px 8px;
 }
@@ -235,7 +242,7 @@
 }
 
 .section-heading h2 {
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .preview-list {
@@ -247,9 +254,9 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 11px;
+  padding: 13px;
   display: grid;
-  gap: 7px;
+  gap: 8px;
 }
 
 .entry-card.is-problem {
@@ -270,19 +277,19 @@
 }
 
 .entry-title strong {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.25;
 }
 
 .entry-title .entry-code {
   color: var(--muted);
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .entry-meta {
   color: var(--muted);
-  font-size: 10.5px;
+  font-size: 11.5px;
   overflow-wrap: anywhere;
 }
 
@@ -302,11 +309,11 @@
 
 .offer-line {
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) auto;
-  gap: 6px;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 7px;
   align-items: baseline;
-  font-size: 11.5px;
-  padding: 4px 0;
+  font-size: 12.5px;
+  padding: 5px 0;
   border-bottom: 1px dashed var(--border);
 }
 
@@ -333,7 +340,7 @@
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
   padding-top: 6px;
   border-top: 1px solid var(--border);
@@ -342,7 +349,7 @@
 .entry-reason {
   display: flex;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--red);
   border-left: 3px solid var(--red);
   padding-left: 8px;
@@ -382,6 +389,12 @@
   text-align: center;
   color: var(--muted);
   font-size: 10.5px;
+}
+
+@media (min-width: 700px) {
+  .popup-body:not(.view-tab) .preview-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .view-tab .popup-header {
