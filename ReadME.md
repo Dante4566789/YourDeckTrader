@@ -17,6 +17,7 @@ pagamenti. L'utente deve sempre verificare il carrello sul sito CardTrader.
 - Il campo `shared_secret` restituito da `/info` viene scartato dal client.
 - `cart/add` viene chiamato sempre con `via_cardtrader_zero: true`.
 - Il report copiabile non contiene token né indirizzi.
+- Privacy Policy completa: [`docs/index.md`](docs/index.md), pubblicabile tramite GitHub Pages.
 
 ## Requisiti
 
