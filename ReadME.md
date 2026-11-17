@@ -1,5 +1,8 @@
 # CardTrader Deck Cart
 
+Status Online : https://chromewebstore.google.com/detail/cardtrader-deck-cart/pjnndjmehbkibdefpphggkbojilbiima?authuser=0&hl=it
+
+
 Estensione Chrome (Manifest V3) per trasformare una lista mazzo Pokémon TCG Live in
 un'anteprima delle migliori offerte **CardTrader Zero** e, solo dopo conferma esplicita,
 aggiungerle al carrello CardTrader.
